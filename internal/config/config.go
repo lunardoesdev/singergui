@@ -179,6 +179,10 @@ func (c *Config) SetSubscriptionSpeedLimitKBps(ctx context.Context, kbps int) er
 
 // GetDataDir returns the application data directory.
 func GetDataDir() (string, error) {
+	if dataDir := os.Getenv("SINGERGUI_DATA_DIR"); dataDir != "" {
+		return dataDir, nil
+	}
+
 	// Use XDG_DATA_HOME on Linux, or appropriate paths on other platforms
 	dataDir := os.Getenv("XDG_DATA_HOME")
 	if dataDir == "" {

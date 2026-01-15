@@ -5,7 +5,10 @@ go 1.25.5
 require (
 	github.com/lunardoesdev/singerbox v0.0.0-20260113014233-b42f6f9608b5
 	github.com/mattn/go-sqlite3 v1.14.33
+	github.com/sagernet/sing v0.7.14
+	github.com/sagernet/sing-box v1.12.15
 	github.com/wailsapp/wails/v2 v2.11.0
+	golang.org/x/sys v0.40.0
 	golang.org/x/time v0.14.0
 )
 
@@ -88,8 +91,6 @@ require (
 	github.com/sagernet/netlink v0.0.0-20240612041022-b9a21c07ac6a // indirect
 	github.com/sagernet/nftables v0.3.0-beta.4 // indirect
 	github.com/sagernet/quic-go v0.52.0-sing-box-mod.3 // indirect
-	github.com/sagernet/sing v0.7.14 // indirect
-	github.com/sagernet/sing-box v1.12.15 // indirect
 	github.com/sagernet/sing-mux v0.3.3 // indirect
 	github.com/sagernet/sing-quic v0.5.2-0.20250909083218-00a55617c0fb // indirect
 	github.com/sagernet/sing-shadowsocks v0.2.8 // indirect
@@ -131,7 +132,6 @@ require (
 	golang.org/x/mod v0.32.0 // indirect
 	golang.org/x/net v0.48.0 // indirect
 	golang.org/x/sync v0.19.0 // indirect
-	golang.org/x/sys v0.40.0 // indirect
 	golang.org/x/term v0.38.0 // indirect
 	golang.org/x/text v0.32.0 // indirect
 	golang.org/x/tools v0.40.0 // indirect

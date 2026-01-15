@@ -57,6 +57,16 @@ export function createApp(container: HTMLElement): void {
       proxyList.refresh();
       sidebar.loadGroups(); // Refresh counts
     },
+    onTunActivated: (data) => {
+      store.setTunStatus({ active: true, interfaceName: data.interface, linkId: data.linkId });
+      toolbar.updateTunStatus();
+      statusBar.setMessage(`TUN enabled on ${data.interface}`);
+    },
+    onTunDeactivated: () => {
+      store.setTunStatus({ active: false, interfaceName: '', linkId: 0 });
+      toolbar.updateTunStatus();
+      statusBar.setMessage('TUN disabled');
+    },
     onStatusMessage: (data) => {
       statusBar.setMessage(data.text);
     }

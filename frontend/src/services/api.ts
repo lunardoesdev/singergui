@@ -15,7 +15,8 @@ import type {
   Settings,
   ClipboardContent,
   MeasurementCounts,
-  ActiveProxyInfo
+  ActiveProxyInfo,
+  TunStatus
 } from '../types';
 
 // API wrapper with error handling
@@ -266,6 +267,35 @@ class API {
       return await App.IsSystemProxySet();
     } catch (e) {
       console.error('Failed to check system proxy:', e);
+      return false;
+    }
+  }
+
+  async getTunStatus(): Promise<TunStatus | null> {
+    try {
+      return await App.GetTunStatus();
+    } catch (e) {
+      console.error('Failed to get TUN status:', e);
+      return null;
+    }
+  }
+
+  async enableTun(linkId: number): Promise<boolean> {
+    try {
+      await App.EnableTun(linkId);
+      return true;
+    } catch (e) {
+      console.error('Failed to enable TUN:', e);
+      return false;
+    }
+  }
+
+  async disableTun(): Promise<boolean> {
+    try {
+      await App.DisableTun();
+      return true;
+    } catch (e) {
+      console.error('Failed to disable TUN:', e);
       return false;
     }
   }

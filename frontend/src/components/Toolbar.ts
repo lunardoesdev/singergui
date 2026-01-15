@@ -1,12 +1,13 @@
 import { api } from '../services/api';
 import { store } from '../state/store';
-import type { ActiveProxyInfo } from '../types';
+import type { ActiveProxyInfo, TunStatus } from '../types';
 import { showSettingsDialog } from '../dialogs/SettingsDialog';
 
 export class Toolbar {
   private container: HTMLElement;
   private listenAddress: string = '127.0.0.1:1080';
   private isSystemProxySet: boolean = false;
+  private tunStatus: TunStatus | null = null;
 
   constructor(container: HTMLElement) {
     this.container = container;
@@ -16,8 +17,10 @@ export class Toolbar {
   async initialize(): Promise<void> {
     this.listenAddress = await api.getListenAddress();
     this.isSystemProxySet = await api.isSystemProxySet();
+    this.tunStatus = await api.getTunStatus();
     store.setListenAddress(this.listenAddress);
     store.setSystemProxySet(this.isSystemProxySet);
+    store.setTunStatus(this.tunStatus);
     this.render();
   }
 
@@ -25,8 +28,15 @@ export class Toolbar {
     this.render();
   }
 
+  updateTunStatus(): void {
+    this.tunStatus = store.getTunStatus();
+    this.render();
+  }
+
   private render(): void {
     const activeProxy = store.getActiveProxy();
+    const tunStatus = store.getTunStatus();
+    const tunActive = tunStatus?.active;
 
     this.container.innerHTML = `
       <div class="flex items-center justify-between px-4 py-2 bg-white border-b border-gray-200">
@@ -57,6 +67,11 @@ export class Toolbar {
           <!-- System proxy toggle -->
           <button id="sysproxy-btn" class="btn ${this.isSystemProxySet ? 'btn-primary' : 'btn-secondary'} btn-sm">
             ${this.isSystemProxySet ? 'Clear System Proxy' : 'Set System Proxy'}
+          </button>
+
+          <!-- TUN toggle -->
+          <button id="tun-btn" class="btn ${tunActive ? 'btn-primary' : 'btn-secondary'} btn-sm">
+            ${tunActive ? 'Disable TUN' : 'Enable TUN'}
           </button>
 
           <!-- Active proxy indicator -->
@@ -110,6 +125,29 @@ export class Toolbar {
           store.setSystemProxySet(true);
           this.render();
         }
+      }
+    });
+
+    // TUN button
+    this.container.querySelector('#tun-btn')?.addEventListener('click', async () => {
+      const tunStatus = store.getTunStatus();
+      const tunActive = tunStatus?.active;
+      if (tunActive) {
+        if (await api.disableTun()) {
+          store.setTunStatus({ active: false, interfaceName: '', linkId: 0 });
+          this.render();
+        }
+        return;
+      }
+
+      const activeProxy = store.getActiveProxy();
+      if (!activeProxy) {
+        alert('Please activate a proxy first');
+        return;
+      }
+
+      if (await api.enableTun(activeProxy.id)) {
+        this.render();
       }
     });
   }

@@ -4,7 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -12,9 +15,11 @@ import (
 	"github.com/lunardoesdev/singergui/internal/config"
 	"github.com/lunardoesdev/singergui/internal/database"
 	"github.com/lunardoesdev/singergui/internal/database/queries"
+	"github.com/lunardoesdev/singergui/internal/elevate"
 	"github.com/lunardoesdev/singergui/internal/proxy"
 	"github.com/lunardoesdev/singergui/internal/proxy/sysproxy"
 	"github.com/lunardoesdev/singergui/internal/subscription"
+	"github.com/lunardoesdev/singergui/internal/tun"
 )
 
 // App struct holds all application state
@@ -26,6 +31,7 @@ type App struct {
 	sysProxy     sysproxy.SystemProxy
 	scheduler    *subscription.Scheduler
 	measurement  *proxy.MeasurementService
+	tunManager   *tun.Manager
 }
 
 // NewApp creates a new App application struct
@@ -68,6 +74,7 @@ func (a *App) startup(ctx context.Context) {
 	a.sysProxy = sysproxy.New()
 	a.scheduler = subscription.NewScheduler(a.db.Queries, a.config)
 	a.measurement = proxy.NewMeasurementService(a.db.Queries, a.proxyManager, a.config)
+	a.tunManager = tun.NewManager()
 
 	// Set up scheduler callback
 	a.scheduler.OnLinksImported = func(count int) {
@@ -78,6 +85,23 @@ func (a *App) startup(ctx context.Context) {
 
 	// Start background tasks
 	a.scheduler.Start(ctx)
+
+	if tokenPath := parseElevateTokenArg(); tokenPath != "" {
+		_ = os.WriteFile(tokenPath, []byte("ok"), 0o644)
+	}
+
+	// Auto-start TUN if requested on launch
+	if linkID, ok := parseStartTunArg(); ok {
+		go func() {
+			if !elevate.IsElevated() {
+				runtime.LogError(ctx, "TUN requested without elevation")
+				return
+			}
+			if err := a.enableTunLink(ctx, linkID); err != nil {
+				runtime.LogError(ctx, "Failed to start TUN: "+err.Error())
+			}
+		}()
+	}
 }
 
 // shutdown is called when the app is closing
@@ -88,12 +112,36 @@ func (a *App) shutdown(ctx context.Context) {
 	if a.proxyManager != nil {
 		a.proxyManager.Deactivate()
 	}
+	if a.tunManager != nil {
+		a.tunManager.Stop(ctx)
+	}
 	if a.sysProxy != nil {
 		a.sysProxy.Clear()
 	}
 	if a.db != nil {
 		a.db.Close()
 	}
+}
+
+func parseStartTunArg() (int64, bool) {
+	for _, arg := range os.Args[1:] {
+		if strings.HasPrefix(arg, "--start-tun=") {
+			val := strings.TrimPrefix(arg, "--start-tun=")
+			if id, err := strconv.ParseInt(val, 10, 64); err == nil && id > 0 {
+				return id, true
+			}
+		}
+	}
+	return 0, false
+}
+
+func parseElevateTokenArg() string {
+	for _, arg := range os.Args[1:] {
+		if strings.HasPrefix(arg, "--elevate-token=") {
+			return strings.TrimPrefix(arg, "--elevate-token=")
+		}
+	}
+	return ""
 }
 
 // ============= Group Methods =============
@@ -760,6 +808,141 @@ func (a *App) ClearSystemProxy() error {
 	})
 
 	return nil
+}
+
+// ============= TUN Methods =============
+
+// TunStatus represents TUN state.
+type TunStatus struct {
+	Active        bool   `json:"active"`
+	InterfaceName string `json:"interfaceName"`
+	LinkID        int64  `json:"linkId"`
+}
+
+// GetTunStatus returns current TUN status.
+func (a *App) GetTunStatus() *TunStatus {
+	if a.tunManager == nil || !a.tunManager.IsActive() {
+		return &TunStatus{Active: false}
+	}
+	return &TunStatus{
+		Active:        true,
+		InterfaceName: a.tunManager.InterfaceName(),
+		LinkID:        a.tunManager.ActiveLinkID(),
+	}
+}
+
+// EnableTun starts TUN for the specified proxy link ID.
+func (a *App) EnableTun(linkID int64) error {
+	if a.tunManager == nil {
+		return fmt.Errorf("tun not available")
+	}
+	if !elevate.IsElevated() {
+		if dataDir, err := config.GetDataDir(); err == nil {
+			_ = os.Setenv("SINGERGUI_DATA_DIR", dataDir)
+		}
+		tokenPath := filepath.Join(os.TempDir(), fmt.Sprintf("singergui-elevate-%d", time.Now().UnixNano()))
+		args := append(filteredArgs(os.Args[1:]),
+			fmt.Sprintf("--start-tun=%d", linkID),
+			fmt.Sprintf("--elevate-token=%s", tokenPath),
+		)
+		if err := elevate.RelaunchElevated(args); err != nil {
+			showElevationError(a.ctx, err)
+			return err
+		}
+		runtime.EventsEmit(a.ctx, "status:message", map[string]interface{}{
+			"text": "Relaunching with administrator privileges to enable TUN...",
+		})
+		go func() {
+			if waitForElevationToken(tokenPath, 20*time.Second) {
+				runtime.Quit(a.ctx)
+				return
+			}
+			showElevationError(a.ctx, fmt.Errorf("elevated process did not start"))
+		}()
+		return nil
+	}
+
+	return a.enableTunLink(a.ctx, linkID)
+}
+
+func showElevationError(ctx context.Context, err error) {
+	runtime.EventsEmit(ctx, "status:message", map[string]interface{}{
+		"text": "Failed to relaunch with administrator privileges",
+	})
+	_, _ = runtime.MessageDialog(ctx, runtime.MessageDialogOptions{
+		Type:    runtime.ErrorDialog,
+		Title:   "Elevation Failed",
+		Message: "SingerGUI couldn't restart with administrator privileges. " + err.Error(),
+	})
+}
+
+// DisableTun stops the TUN instance.
+func (a *App) DisableTun() error {
+	if a.tunManager == nil {
+		return nil
+	}
+	if err := a.tunManager.Stop(a.ctx); err != nil {
+		return err
+	}
+	runtime.EventsEmit(a.ctx, "tun:deactivated", nil)
+	runtime.EventsEmit(a.ctx, "status:message", map[string]interface{}{
+		"text": "TUN disabled",
+	})
+	return nil
+}
+
+func (a *App) enableTunLink(ctx context.Context, linkID int64) error {
+	link, err := a.db.Queries.GetLinkByID(ctx, linkID)
+	if err != nil {
+		return err
+	}
+
+	if a.tunManager.IsActive() && a.tunManager.ActiveLinkID() != linkID {
+		if err := a.tunManager.Stop(ctx); err != nil {
+			return err
+		}
+	}
+
+	if !a.tunManager.IsActive() {
+		if err := a.tunManager.Start(ctx, linkID, link.Link); err != nil {
+			return err
+		}
+	}
+
+	runtime.EventsEmit(ctx, "tun:activated", map[string]interface{}{
+		"interface": a.tunManager.InterfaceName(),
+		"linkId":    linkID,
+	})
+	runtime.EventsEmit(ctx, "status:message", map[string]interface{}{
+		"text": fmt.Sprintf("TUN enabled (%s)", a.tunManager.InterfaceName()),
+	})
+	return nil
+}
+
+func filteredArgs(args []string) []string {
+	filtered := make([]string, 0, len(args))
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "--start-tun=") {
+			continue
+		}
+		if strings.HasPrefix(arg, "--elevate-token=") {
+			continue
+		}
+		filtered = append(filtered, arg)
+	}
+	return filtered
+}
+
+func waitForElevationToken(path string, timeout time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if _, err := os.Stat(path); err == nil {
+			_ = os.Remove(path)
+			return true
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	return false
 }
 
 // IsSystemProxySet checks if system proxy is enabled

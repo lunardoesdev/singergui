@@ -54,6 +54,14 @@ export function DeleteSubscription(arg1) {
   return window['go']['main']['App']['DeleteSubscription'](arg1);
 }
 
+export function DisableTun() {
+  return window['go']['main']['App']['DisableTun']();
+}
+
+export function EnableTun(arg1) {
+  return window['go']['main']['App']['EnableTun'](arg1);
+}
+
 export function GetActiveProxy() {
   return window['go']['main']['App']['GetActiveProxy']();
 }
@@ -124,6 +132,10 @@ export function GetSpeedHistory(arg1, arg2) {
 
 export function GetSubscriptions() {
   return window['go']['main']['App']['GetSubscriptions']();
+}
+
+export function GetTunStatus() {
+  return window['go']['main']['App']['GetTunStatus']();
 }
 
 export function IsSystemProxySet() {

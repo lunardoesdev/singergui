@@ -61,9 +61,9 @@ build-linux-arm:
 # Build all platforms
 build-all: build-linux build-windows build-darwin build-darwin-arm
 
-# Run tests
+# Run tests with feature tags enabled
 test:
-	go test -v ./...
+	go test -v -tags "$(OTHER_TAGS)" ./...
 
 # Clean build artifacts
 clean:

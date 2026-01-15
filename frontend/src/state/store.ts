@@ -1,4 +1,4 @@
-import type { Group, ProxyInfo, ActiveProxyInfo } from '../types';
+import type { Group, ProxyInfo, ActiveProxyInfo, TunStatus } from '../types';
 
 type Listener = () => void;
 
@@ -18,6 +18,7 @@ interface State {
   selectedProxyIds: Set<number>;
   activeProxy: ActiveProxyInfo | null;
   isSystemProxySet: boolean;
+  tunStatus: TunStatus | null;
   listenAddress: string;
   lastSelectedIndex: number | null;  // For shift+click range selection
 }
@@ -31,6 +32,7 @@ class Store {
     selectedProxyIds: new Set(),
     activeProxy: null,
     isSystemProxySet: false,
+    tunStatus: null,
     listenAddress: '127.0.0.1:1080',
     lastSelectedIndex: null
   };
@@ -254,6 +256,16 @@ class Store {
 
   getActiveProxy(): ActiveProxyInfo | null {
     return this.state.activeProxy;
+  }
+
+  // TUN
+  setTunStatus(status: TunStatus | null): void {
+    this.state.tunStatus = status;
+    this.notify();
+  }
+
+  getTunStatus(): TunStatus | null {
+    return this.state.tunStatus;
   }
 
   // System proxy

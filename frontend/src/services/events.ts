@@ -1,7 +1,8 @@
 import type {
   ProxyActivatedEvent,
   SubscriptionCompleteEvent,
-  StatusMessageEvent
+  StatusMessageEvent,
+  TunActivatedEvent
 } from '../types';
 
 // Wails runtime event types
@@ -21,6 +22,8 @@ interface EventCallbacks {
   onSubscriptionImporting?: (data: { id: number; progress: number }) => void;
   onSubscriptionComplete?: (data: SubscriptionCompleteEvent) => void;
   onSysProxyChanged?: (enabled: boolean) => void;
+  onTunActivated?: (data: TunActivatedEvent) => void;
+  onTunDeactivated?: () => void;
   onStatusMessage?: (data: StatusMessageEvent) => void;
 }
 
@@ -69,6 +72,19 @@ export function setupEventListeners(callbacks: EventCallbacks): void {
     runtime.EventsOn('sysproxy:changed', (data: unknown) => {
       const { enabled } = data as { enabled: boolean };
       callbacks.onSysProxyChanged!(enabled);
+    });
+  }
+
+  // TUN events
+  if (callbacks.onTunActivated) {
+    runtime.EventsOn('tun:activated', (data: unknown) => {
+      callbacks.onTunActivated!(data as TunActivatedEvent);
+    });
+  }
+
+  if (callbacks.onTunDeactivated) {
+    runtime.EventsOn('tun:deactivated', () => {
+      callbacks.onTunDeactivated!();
     });
   }
 

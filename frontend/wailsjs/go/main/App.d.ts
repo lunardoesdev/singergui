@@ -28,6 +28,10 @@ export function DeleteProxy(arg1:number):Promise<void>;
 
 export function DeleteSubscription(arg1:number):Promise<void>;
 
+export function DisableTun():Promise<void>;
+
+export function EnableTun(arg1:number):Promise<void>;
+
 export function GetActiveProxy():Promise<main.ActiveProxyInfo>;
 
 export function GetClipboard():Promise<string>;
@@ -63,6 +67,8 @@ export function GetSettings():Promise<main.Settings>;
 export function GetSpeedHistory(arg1:number,arg2:number):Promise<Array<main.SpeedPoint>>;
 
 export function GetSubscriptions():Promise<Array<main.Subscription>>;
+
+export function GetTunStatus():Promise<main.TunStatus>;
 
 export function IsSystemProxySet():Promise<boolean>;
 

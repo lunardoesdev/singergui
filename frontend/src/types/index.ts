@@ -65,6 +65,17 @@ export interface ActiveProxyInfo {
   listenAddress: string;
 }
 
+export interface TunStatus {
+  active: boolean;
+  interfaceName: string;
+  linkId: number;
+}
+
+export interface TunActivatedEvent {
+  interface: string;
+  linkId: number;
+}
+
 // Subscription types
 export interface Subscription {
   id: number;

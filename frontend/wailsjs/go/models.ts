@@ -320,6 +320,22 @@ export namespace main {
 	        this.proxyCount = source["proxyCount"];
 	    }
 	}
+	export class TunStatus {
+	    active: boolean;
+	    interfaceName: string;
+	    linkId: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new TunStatus(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.active = source["active"];
+	        this.interfaceName = source["interfaceName"];
+	        this.linkId = source["linkId"];
+	    }
+	}
 
 }
 
