@@ -40,11 +40,28 @@ type rateLimitedReader struct {
 }
 
 func (r *rateLimitedReader) Read(p []byte) (n int, err error) {
-	// Wait for permission to read based on rate limit
-	if err := r.limiter.WaitN(r.ctx, len(p)); err != nil {
-		return 0, err
+	n, err = r.reader.Read(p)
+	if n <= 0 || r.limiter == nil {
+		return n, err
 	}
-	return r.reader.Read(p)
+
+	remaining := n
+	for remaining > 0 {
+		burst := r.limiter.Burst()
+		if burst <= 0 {
+			burst = 1
+		}
+		toWait := remaining
+		if toWait > burst {
+			toWait = burst
+		}
+		if waitErr := r.limiter.WaitN(r.ctx, toWait); waitErr != nil {
+			return n, waitErr
+		}
+		remaining -= toWait
+	}
+
+	return n, err
 }
 
 // FetchStreaming downloads a subscription URL and calls handler for each line.

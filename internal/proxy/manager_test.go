@@ -127,8 +127,8 @@ func TestNewManager(t *testing.T) {
 		t.Fatal("NewManager() returned nil")
 	}
 
-	if m.baseAddr != "127.0.0.1" {
-		t.Errorf("baseAddr = %q, want %q", m.baseAddr, "127.0.0.1")
+	if m.GetConfiguredAddr() != "127.0.0.1" {
+		t.Errorf("configuredAddr = %q, want %q", m.GetConfiguredAddr(), "127.0.0.1")
 	}
 
 	if m.IsActive() {
@@ -142,7 +142,7 @@ func TestNewManager(t *testing.T) {
 
 func TestNewManagerDefaultAddr(t *testing.T) {
 	m := NewManager("")
-	if m.baseAddr != "127.0.0.1" {
-		t.Errorf("baseAddr should default to 127.0.0.1, got %q", m.baseAddr)
+	if m.GetConfiguredAddr() != "127.0.0.1:1080" {
+		t.Errorf("configuredAddr should default to 127.0.0.1:1080, got %q", m.GetConfiguredAddr())
 	}
 }

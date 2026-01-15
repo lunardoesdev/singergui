@@ -156,19 +156,12 @@ func ParseSubscriptionContent(content string) []string {
 
 	var lines []string
 
-	// Try base64 decode first
-	decoded, err := base64.StdEncoding.DecodeString(content)
-	if err == nil && len(decoded) > 0 && isPrintable(decoded) {
-		lines = strings.Split(string(decoded), "\n")
+	// Try base64 decode first (padded and raw variants)
+	if decoded, ok := decodeBase64Content(content); ok {
+		lines = strings.Split(decoded, "\n")
 	} else {
-		// Try URL-safe base64
-		decoded, err = base64.URLEncoding.DecodeString(content)
-		if err == nil && len(decoded) > 0 && isPrintable(decoded) {
-			lines = strings.Split(string(decoded), "\n")
-		} else {
-			// Assume plain text
-			lines = strings.Split(content, "\n")
-		}
+		// Assume plain text
+		lines = strings.Split(content, "\n")
 	}
 
 	var validLinks []string
@@ -184,6 +177,27 @@ func ParseSubscriptionContent(content string) []string {
 	}
 
 	return validLinks
+}
+
+func decodeBase64Content(content string) (string, bool) {
+	encodings := []*base64.Encoding{
+		base64.StdEncoding,
+		base64.RawStdEncoding,
+		base64.URLEncoding,
+		base64.RawURLEncoding,
+	}
+
+	for _, enc := range encodings {
+		decoded, err := enc.DecodeString(content)
+		if err != nil || len(decoded) == 0 {
+			continue
+		}
+		if isPrintable(decoded) {
+			return string(decoded), true
+		}
+	}
+
+	return "", false
 }
 
 // isPrintable checks if decoded content looks like text.

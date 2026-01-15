@@ -1,6 +1,7 @@
 package subscription
 
 import (
+	"encoding/base64"
 	"testing"
 )
 
@@ -103,6 +104,16 @@ func TestParseSubscriptionContent(t *testing.T) {
 				t.Errorf("ParseSubscriptionContent() returned %d links, want %d", len(links), tt.wantLen)
 			}
 		})
+	}
+}
+
+func TestParseSubscriptionContentRawBase64(t *testing.T) {
+	plain := "vless://uuid@server:443#name1\nvmess://base64\n"
+	encoded := base64.RawStdEncoding.EncodeToString([]byte(plain))
+
+	links := ParseSubscriptionContent(encoded)
+	if len(links) != 2 {
+		t.Fatalf("ParseSubscriptionContent() returned %d links, want %d", len(links), 2)
 	}
 }
 

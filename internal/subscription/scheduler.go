@@ -155,7 +155,11 @@ func (s *Scheduler) updateSubscription(ctx context.Context, subID int64) {
 	err = s.fetcher.FetchStreaming(ctx, sub.Url, func(line string) error {
 		links := ParseSubscriptionContent(line)
 		for _, link := range links {
-			if err := s.importLinkIfNew(ctx, link); err == nil {
+			imported, err := s.importLinkIfNew(ctx, link)
+			if err != nil {
+				return err
+			}
+			if imported {
 				importedCount++
 			}
 		}
@@ -180,20 +184,20 @@ func (s *Scheduler) updateSubscription(ctx context.Context, subID int64) {
 	}
 }
 
-func (s *Scheduler) importLinkIfNew(ctx context.Context, link string) error {
+func (s *Scheduler) importLinkIfNew(ctx context.Context, link string) (bool, error) {
 	// Check if link already exists
 	exists, err := s.db.LinkExists(ctx, link)
 	if err != nil {
-		return err
+		return false, err
 	}
 	if exists != 0 {
-		return nil // Already exists
+		return false, nil // Already exists
 	}
 
 	// Parse link info
 	parsed, err := ParseLink(link)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	// Insert link
@@ -205,7 +209,11 @@ func (s *Scheduler) importLinkIfNew(ctx context.Context, link string) error {
 		Port:     sql.NullInt64{Int64: int64(parsed.Port), Valid: parsed.Port > 0},
 	})
 
-	return err
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
 }
 
 // ImportLinks imports multiple links, skipping duplicates.
